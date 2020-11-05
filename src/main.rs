@@ -1,8 +1,8 @@
 use std::fs;
+use std::io;
 use std::env;
 use std::str;
 use std::collections::HashMap;
-use std::iter::Peekable;
 
 // This is a copy of serde's Value
 enum Item {
@@ -24,45 +24,92 @@ enum Item {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let mut filename = "debian-10.6.0-amd64-netinst.iso.torrent";
 
-    let filename = &args[1];
-    let data = fs::read(filename).expect("unable to read file");
-    let mut it = data.iter().peekable();
-
-    while let Some(&c) = it.peek() {
-        match *c {
-            b'd' => {
-                // do something with the dictionary
-                it.next(); // d
-                let n = get_number(&mut it);
-                let c_it = it.clone().take(n);
-                println!("n = {}", n);
-                break
-            },
-            b'l' => {
-                // do something with the list
-            },
-            _ => continue
-        }
+    if args.len() > 1 {
+        filename = &args[1];
     }
+
+    let mut p = Parser::new(filename).unwrap();
+    p.parse();
+
 }
 
-fn get_number<'a, I>(iter: &mut Peekable<I>) -> usize
-where
-    I: Iterator<Item = &'a u8>
-{
-    let mut nums = Vec::new();
+struct Parser {
+    data: Vec<u8>,
+    current_pos: usize,
+    total_len: usize,
+}
 
-    while let Some(&digit) = iter.peek() {
-        if digit.is_ascii_digit() {
-            nums.push(*digit);
-            iter.next();
+impl Parser {
+    pub fn new(filename: &str) -> Result<Parser, io::Error> {
+        let data = fs::read(filename)?;
+        let total_len = data.len();
+        Ok(Self {
+            data,
+            current_pos: 0,
+            total_len,
+        })
+    }
+
+    pub fn parse(&mut self) -> Item {
+        let x = Item::Byte(0);
+
+        loop {
+            let c = self.data[self.current_pos];
+
+            match c {
+                // d
+                100u8 => {
+                    println!("we got a dict");
+                    let n = self.get_number();
+                    println!("n: {}", n);
+                    break
+                }
+                // l
+                108u8 => {
+                    println!("list");
+                    break
+                }
+                // i
+                105u8 => break,
+                _ => break
+            }
+        }
+
+        x
+    }
+
+    fn get_number(&mut self) -> usize {
+        let mut nums = Vec::new();
+
+        while let Some(digit) = self.peek() {
+            if digit.is_ascii_digit() {
+                nums.push(digit);
+                self.advance();
+            } else {
+                break
+            }
+        }
+        let the_str = str::from_utf8(&nums[..]).unwrap();
+        let the_num: usize = the_str.parse().unwrap();
+
+        the_num
+    }
+
+    fn advance(&mut self) {
+        self.current_pos += 1
+    }
+
+    fn peek(&self) -> Option<u8> {
+        if !self.is_end() {
+            Some(self.data[self.current_pos + 1])
         } else {
-            break
+            None
         }
     }
-    let the_str = str::from_utf8(&nums[..]).unwrap();
-    let the_num: usize = the_str.parse().unwrap();
 
-    the_num
+    fn is_end(&self) -> bool {
+        self.current_pos >= self.total_len
+    }
 }
