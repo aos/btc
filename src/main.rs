@@ -58,26 +58,32 @@ impl Parser {
         loop {
             let c = self.data[self.current_pos];
 
-            match c {
+            match c as char {
                 // d
-                100u8 => {
+                'd' => {
                     println!("we got a dict");
                     let n = self.get_number();
                     println!("n: {}", n);
+                    println!("current_pos: {}", self.current_pos);
+                    self.advance();
                     break
                 }
                 // l
-                108u8 => {
+                'l' => {
                     println!("list");
                     break
                 }
                 // i
-                105u8 => break,
+                'i' => break,
                 _ => break
             }
         }
 
         x
+    }
+
+    fn get_dict(&mut self, n: usize) {
+        let data = self.data.get(self.current_pos..n);
     }
 
     fn get_number(&mut self) -> usize {
