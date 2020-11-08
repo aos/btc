@@ -64,8 +64,10 @@ impl Parser {
                     println!("we got a dict");
                     let n = self.get_number();
                     println!("n: {}", n);
-                    println!("current_pos: {}", self.current_pos);
                     self.advance();
+                    self.advance();
+                    println!("current_pos: {}", self.current_pos);
+                    self.get_dict(n);
                     break
                 }
                 // l
@@ -83,7 +85,20 @@ impl Parser {
     }
 
     fn get_dict(&mut self, n: usize) {
-        let data = self.data.get(self.current_pos..n);
+        self.get_str(n);
+    }
+
+    fn get_str(&mut self, n: usize) {
+        if let Some(s) = self.data.get(self.current_pos..self.current_pos + n) {
+            let key = match str::from_utf8(s) {
+                Ok(v) => v,
+                Err(e) => panic!("invalid: {}", e),
+            };
+
+            println!("key: {}", key.to_owned());
+        } else {
+            println!("out of bounds");
+        }
     }
 
     fn get_number(&mut self) -> usize {
@@ -103,8 +118,11 @@ impl Parser {
         the_num
     }
 
-    fn advance(&mut self) {
-        self.current_pos += 1
+    fn advance(&mut self, n: usize) -> Result<(), io::Error> {
+        if self.current_pos + n > self.total_len {
+            Err("Out of bounds")
+        }
+        self.current_pos += n;
     }
 
     fn peek(&self) -> Option<u8> {
