@@ -1,16 +1,29 @@
 use std::fs;
 use std::io;
+use std::error;
 use std::env;
 use std::str;
 use std::collections::HashMap;
 
-// This is a copy of serde's Value
-enum Item {
-    Byte(u8),
-    Str(String),
-    Int(u64),
-    List(Vec<Item>),
-    Dict(HashMap<String, Item>)
+struct Metainfo {
+    info: Info,
+    announce: String,
+    announce_list: Option<String>,
+    creation_date: Option<String>,
+    comment: Option<String>,
+    created_by: Option<String>,
+    encoding: Option<String>,
+}
+
+enum Info {
+    Single {
+        name: String,
+        length: u32,
+        md5sum: Option<String>,
+        piece_length: u32,
+        pieces: Vec<u8>,
+        private: Option<u32>,
+    }
 }
 
 // bencoding
@@ -30,8 +43,11 @@ fn main() {
         filename = &args[1];
     }
 
-    let mut p = Parser::new(filename).unwrap();
-    p.parse();
+    let data = fs::read(filename).unwrap();
+    let p = String::from_utf8_lossy(&data);
+    println!("{}", p);
+    //let mut p = Parser::new(filename).unwrap();
+    //p.parse();
 
 }
 
@@ -42,7 +58,7 @@ struct Parser {
 }
 
 impl Parser {
-    pub fn new(filename: &str) -> Result<Parser, io::Error> {
+    pub fn new(filename: &str) -> Result<Parser, Box<dyn error::Error>> {
         let data = fs::read(filename)?;
         let total_len = data.len();
         Ok(Self {
@@ -52,8 +68,8 @@ impl Parser {
         })
     }
 
-    pub fn parse(&mut self) -> Item {
-        let x = Item::Byte(0);
+    pub fn parse(&mut self) -> Metainfo {
+        let x = Metainfo {};
 
         loop {
             let c = self.data[self.current_pos];
@@ -64,10 +80,9 @@ impl Parser {
                     println!("we got a dict");
                     let n = self.get_number();
                     println!("n: {}", n);
-                    self.advance();
-                    self.advance();
+                    //self.advance();
+                    //self.advance();
                     println!("current_pos: {}", self.current_pos);
-                    self.get_dict(n);
                     break
                 }
                 // l
@@ -82,10 +97,6 @@ impl Parser {
         }
 
         x
-    }
-
-    fn get_dict(&mut self, n: usize) {
-        self.get_str(n);
     }
 
     fn get_str(&mut self, n: usize) {
@@ -107,7 +118,7 @@ impl Parser {
         while let Some(digit) = self.peek() {
             if digit.is_ascii_digit() {
                 nums.push(digit);
-                self.advance();
+                // self.advance();
             } else {
                 break
             }
@@ -118,11 +129,12 @@ impl Parser {
         the_num
     }
 
-    fn advance(&mut self, n: usize) -> Result<(), io::Error> {
+    fn advance(&mut self, n: usize) -> Result<(), String> {
         if self.current_pos + n > self.total_len {
-            Err("Out of bounds")
+            return Err(format!("Out of bounds"))
         }
         self.current_pos += n;
+        Ok(())
     }
 
     fn peek(&self) -> Option<u8> {
